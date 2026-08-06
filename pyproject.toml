@@ -7,7 +7,9 @@ name = "dbtsmith"
 version = "0.1.0"
 description = "Natural language to a validated dbt project"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "pydantic>=2",
+]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov"]
