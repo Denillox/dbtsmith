@@ -7,8 +7,11 @@ name = "dbtsmith"
 version = "0.1.0"
 description = "Natural language to a validated dbt project"
 requires-python = ">=3.13"
+
 dependencies = [
     "pydantic>=2",
+    "psycopg[binary]>=3",
+    "python-dotenv>=1",
 ]
 
 [project.optional-dependencies]
