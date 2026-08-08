@@ -12,6 +12,8 @@ dependencies = [
     "pydantic>=2",
     "psycopg[binary]>=3",
     "python-dotenv>=1",
+    "langchain>=0.3",
+    "langchain-groq>=0.2",
 ]
 
 [project.optional-dependencies]
