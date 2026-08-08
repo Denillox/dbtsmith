@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: dbtsmith_output
+    schema: public
+    tables:
+      - name: orders
+      - name: customers

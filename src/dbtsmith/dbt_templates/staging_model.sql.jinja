@@ -1,0 +1,14 @@
+SELECT
+{% for col in columns %}
+    {{ col }}{% if not loop.last %},{% endif %}
+{% endfor %}
+FROM (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY {{ dedupe_keys | join(', ') }}
+            ORDER BY {{ order_by }}
+        ) AS rn
+    FROM {{ source_ref }}
+) deduped
+WHERE rn = 1
