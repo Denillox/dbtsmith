@@ -14,7 +14,7 @@ def test_transformation_ir_round_trip():
             },
             {
                 "type": "aggregate",
-                "group_by": ["month"],
+                "group_by": [{"column": "order_date", "granularity": "month"}],
                 "aggregations": [
                     {"column": "order_total", "function": "sum", "alias": "total_order_value"}
                 ],

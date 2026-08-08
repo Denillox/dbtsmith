@@ -32,19 +32,20 @@ class JoinStep(BaseModel):
     on: list[JoinKey]
     how: Literal["inner", "left"]
 
-
 class Aggregation(BaseModel):
-    # One computed column in an aggregate step, e.g. SUM(order_total) AS total
     column: str
-    # Constrained to a small known set of functions for v1, enough to cover the worked example (sum) plus the other common cases.
     function: Literal["sum", "count", "avg"]
     alias: str
 
 
+class GroupByColumn(BaseModel):
+    column: str
+    granularity: Literal["day", "month", "year"] | None = None
+
+
 class AggregateStep(BaseModel):
-    # Group rows and compute aggregate values per group
     type: Literal["aggregate"] = "aggregate"
-    group_by: list[str]
+    group_by: list[GroupByColumn]
     aggregations: list[Aggregation]
 
 
@@ -53,6 +54,8 @@ Step = Annotated[
     Field(discriminator="type"),
 ]
 
+class StepList(BaseModel):
+    steps: list[Step]
 
 # ── Output ───────────────────────────────────────────────────────────────
 
