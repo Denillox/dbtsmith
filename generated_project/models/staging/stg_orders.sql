@@ -1,15 +1,9 @@
 SELECT
-
     id,
-
     customer_id,
-
     order_total,
-
     order_date,
-
     email
-
 FROM (
     SELECT
         *,
