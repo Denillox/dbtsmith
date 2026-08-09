@@ -5,7 +5,7 @@ def test_transformation_ir_round_trip():
     ir = TransformationIR(
         source={"type": "postgres_table", "identifier": "orders"},
         transformations=[
-            {"type": "dedupe", "keys": ["email"], "keep": "first"},
+            {"type": "dedupe", "keys": ["email"], "keep": "first", "order_by": "id"},
             {
                 "type": "join",
                 "target": "customers",

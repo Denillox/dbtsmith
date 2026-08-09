@@ -17,6 +17,7 @@ class DedupeStep(BaseModel):
     type: Literal["dedupe"] = "dedupe"
     keys: list[str]
     keep: Literal["first", "last"]
+    order_by: str
 
 
 class JoinKey(BaseModel):

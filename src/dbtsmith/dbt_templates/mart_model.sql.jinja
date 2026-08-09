@@ -1,0 +1,5 @@
+SELECT
+    {{ select_columns }}
+FROM {{ ref_expr }} o
+{{ join_clause }}
+GROUP BY {{ group_by_expr }}
