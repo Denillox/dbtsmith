@@ -17,13 +17,14 @@ dependencies = [
     "dbt-postgres>=1.10",
     "jinja2>=3",
     "pyyaml>=6",
+    "click>=8",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov"]
 
 [project.scripts]
-dbtsmith = "dbtsmith.cli:main"
+dbtsmith = "dbtsmith.cli:generate"
 
 [tool.setuptools.packages.find]
 where = ["src"]

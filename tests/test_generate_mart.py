@@ -42,7 +42,7 @@ def test_generate_mart_model():
 
 def test_generate_mart_model_requires_join_and_aggregate():
     """Missing join or aggregate should fail loudly, not guess."""
-    ir = _make_ir(transformations=[])  # neither step present
+    ir = _make_ir(transformations=[])
 
     with pytest.raises(ValueError):
         generate_mart_model(ir)

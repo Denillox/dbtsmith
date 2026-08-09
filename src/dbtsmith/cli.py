@@ -1,0 +1,71 @@
+"""
+CLI entrypoint for dbtsmith — chains parsing, introspection,
+generation, and validation into one command.
+"""
+
+import sys
+from pathlib import Path
+
+import click
+from dotenv import load_dotenv
+
+from dbtsmith.ir.input import ParsedInput
+from dbtsmith.ir.parse import parse_instruction
+from dbtsmith.introspect.postgres import get_table_schema
+from dbtsmith.generate.scaffold import scaffold_project
+from dbtsmith.generate.staging import generate_staging_model
+from dbtsmith.generate.mart import generate_mart_model
+from dbtsmith.generate.schema import generate_schema_yml
+from dbtsmith.validate.dbt import validate_project
+
+
+@click.command()
+@click.option("--source", prompt="Source table", help="The Postgres table to transform.")
+@click.option("--instruction", prompt="Instruction", help="Natural language description of the transformation.")
+@click.option("--output", prompt="Output mart name", help="Name of the resulting dbt mart.")
+@click.option("--join", "join_targets", multiple=True, help="Table(s) this instruction joins against. Repeatable.")
+@click.option("--output-dir", default="./dbtsmith_output", type=click.Path(path_type=Path), help="Where to write the generated dbt project.")
+def generate(source, instruction, output, join_targets, output_dir):
+    """Turn a natural-language instruction into a validated dbt project."""
+    load_dotenv()
+
+    parsed_input = ParsedInput(
+        source_table=source,
+        instruction=instruction,
+        output_name=output,
+        join_targets=list(join_targets),
+    )
+
+    click.echo("Parsing instruction...")
+    ir = parse_instruction(parsed_input)
+
+    click.echo("Introspecting source schema...")
+    schema = get_table_schema(source)
+
+    click.echo(f"Scaffolding project at {output_dir}...")
+    scaffold_project(ir, output_dir)
+
+    click.echo("Generating staging model...")
+    staging_sql = generate_staging_model(ir, schema)
+    (output_dir / "models" / "staging" / f"stg_{source}.sql").write_text(staging_sql)
+
+    click.echo("Generating mart model...")
+    mart_sql = generate_mart_model(ir)
+    (output_dir / "models" / "marts" / f"{output}.sql").write_text(mart_sql)
+
+    click.echo("Generating schema.yml...")
+    schema_yml = generate_schema_yml(ir)
+    (output_dir / "models" / "schema.yml").write_text(schema_yml)
+
+    click.echo("Validating generated project...")
+    result = validate_project(output_dir)
+
+    if result.success:
+        click.echo("Success — generated project passed dbt run and dbt test.")
+    else:
+        click.echo("Validation failed.")
+        if result.test is not None:
+            click.echo(result.test.output)
+        else:
+            click.echo(result.run.output)
+        sys.exit(1)
