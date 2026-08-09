@@ -10,7 +10,7 @@ for now.
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
-from dbtsmith.ir.models import TransformationIR, JoinStep, AggregateStep
+from dbtsmith.ir.models import TransformationIR, JoinStep, AggregateStep, GroupByColumn
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "dbt_templates"
 
@@ -50,13 +50,17 @@ def _build_group_by_expr(aggregate_step: AggregateStep) -> str:
         return f"o.{group_col.column}"
 
 
-def _build_select_columns(aggregate_step: AggregateStep, group_by_expr: str) -> str:
-    group_col = aggregate_step.group_by[0]
+def group_by_alias(group_col: GroupByColumn) -> str:
+    """The column name the group-by expression ends up aliased as in
+    the generated SQL — shared with schema.py so tests stay in sync
+    with what's actually generated."""
     if group_col.granularity is not None:
-        alias = f"{group_col.column}_{group_col.granularity}"
-    else:
-        alias = group_col.column
+        return f"{group_col.column}_{group_col.granularity}"
+    return group_col.column
 
+
+def _build_select_columns(aggregate_step: AggregateStep, group_by_expr: str) -> str:
+    alias = group_by_alias(aggregate_step.group_by[0])
     lines = [f"{group_by_expr} AS {alias}"]
 
     for agg in aggregate_step.aggregations:

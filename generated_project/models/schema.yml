@@ -1,0 +1,13 @@
+version: 2
+models:
+- name: stg_orders
+  columns:
+  - name: email
+    tests:
+    - not_null
+    - unique
+- name: monthly_customer_orders
+  columns:
+  - name: order_date_month
+    tests:
+    - not_null
