@@ -7,3 +7,17 @@ services:
       POSTGRES_DB: dbtsmith_dev
     ports:
       - "5432:5432"
+
+  dbtsmith:
+    build: .
+    depends_on:
+      - postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: dbtsmith
+      POSTGRES_PASSWORD: dbtsmith_dev
+      POSTGRES_DB: dbtsmith_dev
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    volumes:
+      - ./docker_output:/app/output

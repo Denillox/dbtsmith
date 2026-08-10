@@ -16,3 +16,4 @@ Thumbs.db
 .coverage
 htmlcov/
 generated_project/.user.yml
+docker_output/

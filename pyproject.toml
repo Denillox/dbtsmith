@@ -28,3 +28,6 @@ dbtsmith = "dbtsmith.cli:generate"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+dbtsmith = ["dbt_templates/*.jinja"]
