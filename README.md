@@ -1,11 +1,11 @@
 # dbtsmith
 
 Turns a natural-language description of a data transformation into a working, validated **dbt project** — staging models, a mart, schema tests — instead of requiring someone to hand-write dbt SQL and YAML from scratch.
-It is quite simplistic for v1, but will continue working and developing parts to develop it into a more sophisticated pipeline (see v1 scope).
 
 ```
-Input:  source = a Postgres table, instruction = "dedupe by email, join
-        with the customers table, aggregate order totals by month"
+Input:  source = a Postgres table (or CSV file), instruction = "dedupe
+        by email, join with the customers table, aggregate order
+        totals by month"
 
 Output: a scaffolded dbt project (staging model, mart, schema.yml with
         tests) that has actually been run against the real data and
@@ -23,15 +23,15 @@ Asking an LLM to freely generate a dbt project from a prompt is unreliable — i
 ## Architecture
 
 ```
-Natural language input (source table, instruction, output name, join targets)
+Natural language input (source table/CSV, instruction, output name, join targets)
     ↓
-Schema introspection (real column names/types from Postgres)
+Schema introspection (real column names/types — Postgres or CSV)
     ↓
 LLM parses instruction → structured TransformationIR, grounded in real schema
     ↓
 Deterministic generation (no LLM) → staging model, mart, schema.yml
     ↓
-Validation: dbt run + dbt test against real data
+Validation: dbt seed (if CSV) + dbt run + dbt test against real data
     ↓
 Pass/fail reported, generated project handed back
 ```
@@ -57,6 +57,16 @@ docker compose run --rm dbtsmith \
 
 Generated output lands in `./docker_output` on your machine.
 
+A CSV file works the same way — just point `--source` at a `.csv` path instead of a table name (source type is inferred automatically from the extension):
+
+```bash
+docker compose run --rm dbtsmith \
+  --source /app/tests/fixtures/sample_orders.csv \
+  --instruction "dedupe by email, aggregate order totals by month" \
+  --output monthly_orders \
+  --output-dir /app/output
+```
+
 ## Local development setup
 
 ```bash
@@ -75,6 +85,7 @@ dbtsmith --source orders --instruction "..." --output ... --join customers
 - **Language:** Python 3.13+
 - **LLM orchestration:** LangChain, using Groq (Llama 3.3 70B)
 - **Transformation target:** dbt Core (Postgres adapter)
+- **Sources:** Postgres tables, or CSV files (loaded via `dbt seed`)
 - **Validation:** pydantic for the structured IR, pytest for the test suite
 - **CLI:** click
 - **Containerization:** Docker + Docker Compose
@@ -83,12 +94,12 @@ dbtsmith --source orders --instruction "..." --output ... --join customers
 
 ```
 src/dbtsmith/
-├── ir/            # structured intermediate representation + NL parsing
-├── introspect/     # real schema introspection (Postgres)
-├── generate/       # deterministic dbt project generation
-├── validate/       # dbt run/test execution + pass/fail reporting
-├── dbt_templates/  # Jinja templates used by generate/
-└── cli.py          # entrypoint
+├── ir/             # structured intermediate representation + NL parsing
+├── introspect/      # real schema introspection (Postgres, CSV)
+├── generate/        # deterministic dbt project generation
+├── validate/        # dbt seed/run/test execution + pass/fail reporting
+├── dbt_templates/   # Jinja templates used by generate/
+└── cli.py           # entrypoint
 ```
 
 ## Testing
@@ -103,15 +114,16 @@ Some tests require the local Postgres container running (`docker compose up -d p
 
 Deliberately narrow, to prove the core pipeline end-to-end before broadening:
 
-- Single Postgres table as source (CSV support scoped for later)
+- Postgres table or CSV file as the main source; join targets are Postgres-only (no CSV-to-CSV or CSV-to-Postgres joins yet)
 - Exactly one join and one aggregate step per transformation
 - Basic generated tests only (`not_null`, `unique`) — scoped to what the IR structurally guarantees, not general data-quality heuristics
 - No self-correction loop on validation failure — failures are reported clearly, not auto-fixed (see below)
+- CSV date-like columns are inferred as `text`, not `date` — works in practice (Postgres casts leniently in `DATE_TRUNC(...)`), but not a fully correct inference; documented rather than silently accepted
 
 ## Possible future improvements
 
 - **LLM self-correction loop** — on `dbt test` failure, feed the error back to the LLM and attempt a fix (a genuine LangGraph use case — a real loop with state, not a single call)
 - **Streamlit interface** as an alternative to the CLI
 - Support for multiple joins/aggregations per transformation
-- CSV as a source type, alongside Postgres
+- Proper CSV date-column detection
 - Looser, more freeform natural-language input, once the structured-input pipeline is well-proven
