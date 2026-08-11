@@ -5,8 +5,11 @@ from langchain_groq import ChatGroq
 from dbtsmith.ir.input import ParsedInput
 from dbtsmith.ir.models import Step, StepList, TransformationIR, Source, Output
 from dbtsmith.introspect.models import TableSchema
-from dbtsmith.introspect.postgres import get_table_schema
+from dbtsmith.introspect.postgres import get_table_schema as get_postgres_schema
+from dbtsmith.introspect.csv import get_table_schema as get_csv_schema
 
+def _is_csv(source: str) -> bool:
+    return source.endswith(".csv")
 
 def _build_prompt(instruction: str, schemas: list[TableSchema]) -> str:
     prompt = ""
@@ -38,17 +41,23 @@ def parse_instruction(parsed_input: ParsedInput) -> TransformationIR:
     )
 
     structured_llm = llm.with_structured_output(StepList)
+    is_csv = _is_csv(parsed_input.source_table)
 
-    # Introspect the source table plus every join target — real schema
-    # for every table the instruction could possibly reference.
-    tables_to_introspect = [parsed_input.source_table] + parsed_input.join_targets
-    schemas = [get_table_schema(table) for table in tables_to_introspect]
+    if is_csv:
+        source_schema = get_csv_schema(parsed_input.source_table)
+    else:
+        source_schema = get_postgres_schema(parsed_input.source_table)
+
+    join_schemas = [get_postgres_schema(t) for t in parsed_input.join_targets]
+    schemas = [source_schema] + join_schemas
 
     prompt = _build_prompt(parsed_input.instruction, schemas)
     result = structured_llm.invoke(prompt)
 
+    source_type = "csv" if is_csv else "postgres_table"
+
     return TransformationIR(
-        source=Source(type="postgres_table", identifier=parsed_input.source_table),
+        source=Source(type=source_type, identifier=parsed_input.source_table),
         transformations=result.steps,
         output=Output(name=parsed_input.output_name),
     )

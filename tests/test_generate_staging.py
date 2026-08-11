@@ -4,11 +4,6 @@ from dbtsmith.generate.staging import generate_staging_model
 
 
 def test_generate_staging_model_with_dedupe():
-    """
-    Generated SQL should reflect the dedupe step's real keys and
-    order_by — checking structure, not exact text, since template
-    formatting details could reasonably change later.
-    """
     ir = TransformationIR(
         source={"type": "postgres_table", "identifier": "orders"},
         transformations=[
@@ -33,3 +28,26 @@ def test_generate_staging_model_with_dedupe():
     assert "source('dbtsmith_output', 'orders')" in sql
     assert "order_total" in sql
     assert "rn\n" not in sql.split("FROM (")[0] 
+
+
+def test_generate_staging_model_csv_uses_ref():
+    ir = TransformationIR(
+        source={"type": "csv", "identifier": "tests/fixtures/sample_orders.csv"},
+        transformations=[
+            {"type": "dedupe", "keys": ["email"], "keep": "first", "order_by": "id"},
+        ],
+        output={"name": "some_output"},
+    )
+    schema = TableSchema(
+        table_name="sample_orders",
+        columns=[
+            ColumnInfo(name="id", data_type="integer"),
+            ColumnInfo(name="email", data_type="text"),
+            ColumnInfo(name="order_total", data_type="numeric"),
+        ],
+    )
+
+    sql = generate_staging_model(ir, schema)
+
+    assert "ref('sample_orders')" in sql
+    assert "source(" not in sql

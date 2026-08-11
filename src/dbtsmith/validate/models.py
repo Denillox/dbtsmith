@@ -6,6 +6,7 @@ class CommandResult(BaseModel):
     output: str       
 
 class ValidationResult(BaseModel):
-    run: CommandResult
-    test: CommandResult | None
+    seed: CommandResult
+    run: CommandResult | None  
+    test: CommandResult | None  
     success: bool

@@ -1,0 +1,13 @@
+id,customer_id,email,order_total,order_date
+1,1,a@example.com,100.00,2025-01-15
+2,1,a@example.com,100.00,2025-01-15
+3,2,b@example.com,250.00,2025-02-03
+4,3,c@example.com,75.50,2025-02-10
+5,2,b@example.com,300.25,2025-02-18
+6,4,d@example.com,45.00,2025-03-01
+7,3,c@example.com,120.00,2025-03-05
+8,5,e@example.com,89.99,2025-03-12
+9,4,d@example.com,60.00,2025-03-20
+10,1,a@example.com,150.00,2025-04-02
+11,6,f@example.com,200.00,2025-04-10
+12,5,e@example.com,95.00,2025-04-15

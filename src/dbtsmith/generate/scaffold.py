@@ -7,6 +7,7 @@ with nothing hand-authored in advance.
 
 from pathlib import Path
 import yaml
+import shutil
 
 from dbtsmith.ir.models import TransformationIR, JoinStep
 
@@ -44,10 +45,15 @@ dbtsmith_output:
 
 
 def _get_all_source_tables(ir: TransformationIR) -> list[str]:
-    tables = [ir.source.identifier]
+    tables = []
+
+    if ir.source.type == "postgres_table":
+        tables.append(ir.source.identifier)
+
     for step in ir.transformations:
         if isinstance(step, JoinStep):
             tables.append(step.target)
+
     return tables
 
 
@@ -70,9 +76,14 @@ def scaffold_project(ir: TransformationIR, output_dir: Path) -> None:
     ready for staging/mart/schema files to be written into it."""
     (output_dir / "models" / "staging").mkdir(parents=True, exist_ok=True)
     (output_dir / "models" / "marts").mkdir(parents=True, exist_ok=True)
+    (output_dir / "seeds").mkdir(parents=True, exist_ok=True)
 
     (output_dir / "dbt_project.yml").write_text(DBT_PROJECT_YML)
     (output_dir / "profiles.yml").write_text(PROFILES_YML)
 
     sources_yml = _generate_sources_yml(ir)
     (output_dir / "models" / "staging" / "sources.yml").write_text(sources_yml)
+
+    if ir.source.type == "csv":
+        csv_path = Path(ir.source.identifier)
+        shutil.copy(csv_path, output_dir / "seeds" / csv_path.name)

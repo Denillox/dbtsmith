@@ -45,3 +45,21 @@ def test_generate_schema_yml():
     group_column = mart["columns"][0]
     assert group_column["name"] == "order_date_month"
     assert group_column["tests"] == ["not_null"]
+
+
+def test_generate_schema_yml_no_mart():
+    """No join/aggregate steps present -> schema.yml should only
+    include the staging entry, not reference a mart that will never
+    be generated."""
+    ir = TransformationIR(
+        source={"type": "postgres_table", "identifier": "orders"},
+        transformations=[
+            {"type": "dedupe", "keys": ["email"], "keep": "first", "order_by": "id"},
+        ],
+        output={"name": "some_output"},
+    )
+    yml_text = generate_schema_yml(ir)
+    parsed = yaml.safe_load(yml_text)
+
+    assert len(parsed["models"]) == 1
+    assert parsed["models"][0]["name"] == "stg_orders"

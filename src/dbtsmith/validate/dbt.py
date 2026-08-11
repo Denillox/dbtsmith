@@ -20,18 +20,26 @@ def _run_dbt_command(args: list[str], project_dir: Path) -> CommandResult:
 
 
 def validate_project(project_dir: Path) -> ValidationResult:
+    seed_result = _run_dbt_command(
+        ["dbt", "seed", "--profiles-dir", "."], project_dir
+    )
+
+    if not seed_result.success:
+        return ValidationResult(seed=seed_result, run=None, test=None, success=False)
+
     run_result = _run_dbt_command(
         ["dbt", "run", "--profiles-dir", "."], project_dir
     )
 
     if not run_result.success:
-        return ValidationResult(run=run_result, test=None, success=False)
+        return ValidationResult(seed=seed_result, run=run_result, test=None, success=False)
 
     test_result = _run_dbt_command(
         ["dbt", "test", "--profiles-dir", "."], project_dir
     )
 
     return ValidationResult(
+        seed=seed_result,
         run=run_result,
         test=test_result,
         success=test_result.success,

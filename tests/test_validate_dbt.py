@@ -22,16 +22,14 @@ def _get_connection():
 
 
 def test_validate_project_success():
-    """Against the current, valid seed data, validation should pass"""
     result = validate_project(PROJECT_DIR)
     assert result.success is True
+    assert result.seed.success is True
     assert result.run.success is True
     assert result.test.success is True
 
 
 def test_validate_project_reports_real_failure():
-    """A genuine null-email row should cause dbt test to fail, and
-    validate_project should correctly report that"""
     conn = _get_connection()
     try:
         conn.execute(
@@ -46,6 +44,7 @@ def test_validate_project_reports_real_failure():
         assert result.run.success is True
         assert result.test.success is False
         assert "not_null_stg_orders_email" in result.test.output
+        assert result.seed.success is True
     finally:
         conn.execute("DELETE FROM orders WHERE id = 999")
         conn.commit()

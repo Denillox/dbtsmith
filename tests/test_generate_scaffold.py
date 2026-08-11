@@ -20,6 +20,23 @@ def _make_ir():
         output={"name": "monthly_customer_orders"},
     )
 
+def _make_csv_ir():
+    return TransformationIR(
+        source={"type": "csv", "identifier": "tests/fixtures/sample_orders.csv"},
+        transformations=[
+            {"type": "dedupe", "keys": ["email"], "keep": "first", "order_by": "id"},
+        ],
+        output={"name": "some_output"},
+    )
+
+def test_scaffold_project_csv_source(tmp_path):
+    ir = _make_csv_ir()
+    scaffold_project(ir, tmp_path)
+
+    assert (tmp_path / "seeds" / "sample_orders.csv").exists()
+
+    sources = yaml.safe_load((tmp_path / "models" / "staging" / "sources.yml").read_text())
+    assert sources["sources"][0]["tables"] == []
 
 def test_scaffold_project_creates_structure(tmp_path):
     ir = _make_ir()

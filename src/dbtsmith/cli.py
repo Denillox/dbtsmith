@@ -11,10 +11,11 @@ from dotenv import load_dotenv
 
 from dbtsmith.ir.input import ParsedInput
 from dbtsmith.ir.parse import parse_instruction
-from dbtsmith.introspect.postgres import get_table_schema
+from dbtsmith.introspect.postgres import get_table_schema as get_postgres_schema
+from dbtsmith.introspect.csv import get_table_schema as get_csv_schema
 from dbtsmith.generate.scaffold import scaffold_project
-from dbtsmith.generate.staging import generate_staging_model
-from dbtsmith.generate.mart import generate_mart_model
+from dbtsmith.generate.staging import generate_staging_model, staging_model_name
+from dbtsmith.generate.mart import generate_mart_model, ir_has_mart
 from dbtsmith.generate.schema import generate_schema_yml
 from dbtsmith.validate.dbt import validate_project
 
@@ -40,18 +41,24 @@ def generate(source, instruction, output, join_targets, output_dir):
     ir = parse_instruction(parsed_input)
 
     click.echo("Introspecting source schema...")
-    schema = get_table_schema(source)
+    if source.endswith(".csv"):
+        schema = get_csv_schema(source)
+    else:
+        schema = get_postgres_schema(source)
 
     click.echo(f"Scaffolding project at {output_dir}...")
     scaffold_project(ir, output_dir)
 
     click.echo("Generating staging model...")
     staging_sql = generate_staging_model(ir, schema)
-    (output_dir / "models" / "staging" / f"stg_{source}.sql").write_text(staging_sql)
+    (output_dir / "models" / "staging" / f"{staging_model_name(ir)}.sql").write_text(staging_sql)
 
-    click.echo("Generating mart model...")
-    mart_sql = generate_mart_model(ir)
-    (output_dir / "models" / "marts" / f"{output}.sql").write_text(mart_sql)
+    if ir_has_mart(ir):
+        click.echo("Generating mart model...")
+        mart_sql = generate_mart_model(ir)
+        (output_dir / "models" / "marts" / f"{output}.sql").write_text(mart_sql)
+    else:
+        click.echo("No join/aggregate steps — skipping mart generation.")
 
     click.echo("Generating schema.yml...")
     schema_yml = generate_schema_yml(ir)
@@ -61,11 +68,13 @@ def generate(source, instruction, output, join_targets, output_dir):
     result = validate_project(output_dir)
 
     if result.success:
-        click.echo("Success — generated project passed dbt run and dbt test.")
+        click.echo("Success — generated project passed dbt seed, dbt run, and dbt test.")
     else:
         click.echo("Validation failed.")
         if result.test is not None:
             click.echo(result.test.output)
-        else:
+        elif result.run is not None:
             click.echo(result.run.output)
+        else:
+            click.echo(result.seed.output)
         sys.exit(1)

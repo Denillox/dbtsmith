@@ -29,6 +29,10 @@ def _get_aggregate_step(ir: TransformationIR) -> AggregateStep | None:
     return None
 
 
+def ir_has_mart(ir: TransformationIR) -> bool:
+    return _get_join_step(ir) is not None and _get_aggregate_step(ir) is not None
+
+
 def _build_join_clause(join_step: JoinStep) -> str:
     how_map = {"inner": "INNER JOIN", "left": "LEFT JOIN"}
     how_sql = how_map[join_step.how]
