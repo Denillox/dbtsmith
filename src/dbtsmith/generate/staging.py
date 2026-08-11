@@ -7,21 +7,32 @@ from dbtsmith.introspect.models import TableSchema
 TEMPLATES_DIR = Path(__file__).parent.parent / "dbt_templates"
 
 
+def staging_model_name(ir: TransformationIR) -> str:
+    if ir.source.type == "csv":
+        base = Path(ir.source.identifier).stem
+    else:
+        base = ir.source.identifier
+    return f"stg_{base}"
+
+
 def _get_dedupe_step(ir: TransformationIR) -> DedupeStep | None:
     for step in ir.transformations:
         if isinstance(step, DedupeStep):
             return step
     return None
 
+
 def generate_staging_model(ir: TransformationIR, schema: TableSchema) -> str:
-    """Render the staging model SQL for this IR's source table."""
     dedupe_step = _get_dedupe_step(ir)
 
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     template = env.get_template("staging_model.sql.jinja")
 
-
-    source_ref = f"{{{{ source('dbtsmith_output', '{ir.source.identifier}') }}}}"
+    if ir.source.type == "csv":
+        seed_name = Path(ir.source.identifier).stem
+        source_ref = f"{{{{ ref('{seed_name}') }}}}"
+    else:
+        source_ref = f"{{{{ source('dbtsmith_output', '{ir.source.identifier}') }}}}"
 
     columns = [col.name for col in schema.columns]
 

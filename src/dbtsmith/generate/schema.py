@@ -1,24 +1,24 @@
 import yaml
 
 from dbtsmith.ir.models import TransformationIR
-from dbtsmith.generate.staging import _get_dedupe_step
-from dbtsmith.generate.mart import _get_join_step, _get_aggregate_step, group_by_alias
+from dbtsmith.generate.staging import _get_dedupe_step, staging_model_name
+from dbtsmith.generate.mart import _get_aggregate_step, group_by_alias, ir_has_mart
 
 
 def _staging_model_entry(ir: TransformationIR) -> dict:
     dedupe_step = _get_dedupe_step(ir)
+    name = staging_model_name(ir)
 
     if dedupe_step is None:
-        return {"name": f"stg_{ir.source.identifier}", "columns": []}
+        return {"name": name, "columns": []}
 
     return {
-        "name": f"stg_{ir.source.identifier}",
+        "name": name,
         "columns": [
             {"name": key, "tests": ["not_null", "unique"]}
             for key in dedupe_step.keys
         ],
     }
-
 
 def _mart_model_entry(ir: TransformationIR) -> dict:
     aggregate_step = _get_aggregate_step(ir)
@@ -38,13 +38,14 @@ def _mart_model_entry(ir: TransformationIR) -> dict:
 
 
 def generate_schema_yml(ir: TransformationIR) -> str:
-    """Render the full schema.yml content as a YAML string."""
+    models = [_staging_model_entry(ir)]
+
+    if ir_has_mart(ir):
+        models.append(_mart_model_entry(ir))
+
     schema_dict = {
         "version": 2,
-        "models": [
-            _staging_model_entry(ir),
-            _mart_model_entry(ir),
-        ],
+        "models": models,
     }
 
     return yaml.dump(schema_dict, sort_keys=False)

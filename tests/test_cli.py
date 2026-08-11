@@ -26,7 +26,7 @@ def _fake_ir():
 @patch("dbtsmith.cli.generate_schema_yml")
 @patch("dbtsmith.cli.generate_mart_model")
 @patch("dbtsmith.cli.generate_staging_model")
-@patch("dbtsmith.cli.get_table_schema")
+@patch("dbtsmith.cli.get_postgres_schema")
 @patch("dbtsmith.cli.parse_instruction")
 def test_cli_success_path(
     mock_parse, mock_get_schema, mock_staging, mock_mart, mock_schema_yml, mock_validate,
@@ -38,10 +38,11 @@ def test_cli_success_path(
     mock_mart.return_value = "SELECT 2"
     mock_schema_yml.return_value = "version: 2"
     mock_validate.return_value = ValidationResult(
-        run=CommandResult(command="dbt run", success=True, output="ok"),
-        test=CommandResult(command="dbt test", success=True, output="ok"),
-        success=True,
-    )
+    seed=CommandResult(command="dbt seed", success=True, output="ok"),
+    run=CommandResult(command="dbt run", success=True, output="ok"),
+    test=CommandResult(command="dbt test", success=True, output="ok"),
+    success=True,
+)
 
     runner = CliRunner()
     result = runner.invoke(generate, [
@@ -61,7 +62,7 @@ def test_cli_success_path(
 @patch("dbtsmith.cli.generate_schema_yml")
 @patch("dbtsmith.cli.generate_mart_model")
 @patch("dbtsmith.cli.generate_staging_model")
-@patch("dbtsmith.cli.get_table_schema")
+@patch("dbtsmith.cli.get_postgres_schema")
 @patch("dbtsmith.cli.parse_instruction")
 def test_cli_reports_validation_failure(
     mock_parse, mock_get_schema, mock_staging, mock_mart, mock_schema_yml, mock_validate,
@@ -73,10 +74,11 @@ def test_cli_reports_validation_failure(
     mock_mart.return_value = "SELECT 2"
     mock_schema_yml.return_value = "version: 2"
     mock_validate.return_value = ValidationResult(
-        run=CommandResult(command="dbt run", success=True, output="ok"),
-        test=CommandResult(command="dbt test", success=False, output="FAIL not_null_stg_orders_email"),
-        success=False,
-    )
+    seed=CommandResult(command="dbt seed", success=True, output="ok"),
+    run=CommandResult(command="dbt run", success=True, output="ok"),
+    test=CommandResult(command="dbt test", success=False, output="FAIL not_null_stg_orders_email"),
+    success=False,
+)
 
     runner = CliRunner()
     result = runner.invoke(generate, [
@@ -90,3 +92,42 @@ def test_cli_reports_validation_failure(
     assert result.exit_code == 1
     assert "Validation failed" in result.output
     assert "not_null_stg_orders_email" in result.output
+
+@patch("dbtsmith.cli.validate_project")
+@patch("dbtsmith.cli.generate_schema_yml")
+@patch("dbtsmith.cli.generate_mart_model")
+@patch("dbtsmith.cli.generate_staging_model")
+@patch("dbtsmith.cli.get_postgres_schema")
+@patch("dbtsmith.cli.parse_instruction")
+def test_cli_skips_mart_when_no_join(
+    mock_parse, mock_get_schema, mock_staging, mock_mart, mock_schema_yml, mock_validate,
+    tmp_path,
+):
+    mock_parse.return_value = TransformationIR(
+        source={"type": "postgres_table", "identifier": "orders"},
+        transformations=[
+            {"type": "dedupe", "keys": ["email"], "keep": "first", "order_by": "id"},
+        ],
+        output={"name": "some_output"},
+    )
+
+    mock_get_schema.return_value = MagicMock()
+    mock_staging.return_value = "SELECT 1"
+    mock_schema_yml.return_value = "version: 2"
+    mock_validate.return_value = ValidationResult(
+        seed=CommandResult(command="dbt seed", success=True, output="ok"),
+        run=CommandResult(command="dbt run", success=True, output="ok"),
+        test=CommandResult(command="dbt test", success=True, output="ok"),
+        success=True,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(generate, [
+        "--source", "orders",
+        "--instruction", "dedupe by email",
+        "--output", "some_output",
+        "--output-dir", str(tmp_path),
+    ])
+
+    assert result.exit_code == 0
+    mock_mart.assert_not_called()
