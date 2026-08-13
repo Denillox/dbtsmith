@@ -61,3 +61,45 @@ def parse_instruction(parsed_input: ParsedInput) -> TransformationIR:
         transformations=result.steps,
         output=Output(name=parsed_input.output_name),
     )
+
+
+def parse_instruction_with_feedback(
+    parsed_input: ParsedInput,
+    previous_ir: TransformationIR,
+    failure_output: str,
+) -> TransformationIR:
+    load_dotenv()
+    llm = ChatGroq(
+        model="llama-3.3-70b-versatile",
+        api_key=os.getenv("GROQ_API_KEY"),
+    )
+    structured_llm = llm.with_structured_output(StepList)
+
+    is_csv = _is_csv(parsed_input.source_table)
+    source_schema = get_csv_schema(parsed_input.source_table) if is_csv else get_postgres_schema(parsed_input.source_table)
+    join_schemas = [get_postgres_schema(t) for t in parsed_input.join_targets]
+    schemas = [source_schema] + join_schemas
+
+    base_prompt = _build_prompt(parsed_input.instruction, schemas)
+
+    previous_steps_json = previous_ir.model_dump_json(include={"transformations"})
+
+    feedback_prompt = (
+        f"{base_prompt}\n\n"
+        "A previous attempt at this instruction produced the following "
+        f"steps, but failed validation:\n{previous_steps_json}\n\n"
+        f"The validation failure was:\n{failure_output[-1500:]}\n\n"
+        "Produce a corrected ordered list of transformation steps that "
+        "still fulfills the original instruction above, but avoids the "
+        "cause of this specific failure. Do not simply remove steps to "
+        "avoid the error — only change what's actually wrong."
+    )
+
+    result = structured_llm.invoke(feedback_prompt)
+    source_type = "csv" if is_csv else "postgres_table"
+
+    return TransformationIR(
+        source=Source(type=source_type, identifier=parsed_input.source_table),
+        transformations=result.steps,
+        output=Output(name=parsed_input.output_name),
+    )

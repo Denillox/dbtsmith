@@ -131,3 +131,29 @@ def test_cli_skips_mart_when_no_join(
 
     assert result.exit_code == 0
     mock_mart.assert_not_called()
+
+
+@patch("dbtsmith.cli.generate_with_correction")
+def test_cli_allow_retry_uses_correction_loop(mock_correction, tmp_path):
+    mock_correction.return_value = {
+        "attempt": 1,
+        "history": [{"attempt": 1, "success": True, "output": "passed", "ir": {}}],
+        "validation_result": ValidationResult(
+            seed=CommandResult(command="dbt seed", success=True, output="ok"),
+            run=CommandResult(command="dbt run", success=True, output="ok"),
+            test=CommandResult(command="dbt test", success=True, output="ok"),
+            success=True,
+        ),
+    }
+
+    runner = CliRunner()
+    result = runner.invoke(generate, [
+        "--source", "orders",
+        "--instruction", "dedupe by email",
+        "--output", "some_output",
+        "--output-dir", str(tmp_path),
+        "--allow-retry",
+    ])
+
+    assert result.exit_code == 0
+    mock_correction.assert_called_once()

@@ -19,6 +19,7 @@ dependencies = [
     "pyyaml>=6",
     "click>=8",
     "pandas>=2",
+    "langgraph>=0.2",
 ]
 
 [project.optional-dependencies]
