@@ -12,6 +12,19 @@ CREATE TABLE orders (
     order_date DATE
 );
 
+CREATE TABLE products (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    category TEXT
+);
+
+ALTER TABLE orders ADD COLUMN product_id INTEGER;
+UPDATE orders SET product_id = 1 WHERE id IN (1, 3);
+
+INSERT INTO products (id, name, category) VALUES
+    (1, 'Widget', 'Hardware'),
+    (2, 'Gadget', 'Electronics');
+
 INSERT INTO customers (id, email, region) VALUES
     (1, 'a@example.com', 'EU'),
     (2, 'b@example.com', 'US');
