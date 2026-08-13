@@ -1,6 +1,6 @@
 # dbtsmith
 
-Turns a natural-language description of a data transformation into a working, validated **dbt project** — staging models, a mart, schema tests — instead of requiring someone to hand-write dbt SQL and YAML from scratch.
+Turns a natural-language description of a data transformation into a working, validated **dbt project** — staging models, a mart, schema tests — instead of requiring someone to hand-write dbt SQL and YAML from scratch. Usable as a CLI or through a Streamlit web UI.
 
 ```
 Input:  source = a Postgres table (or CSV file), instruction = "dedupe
@@ -80,6 +80,17 @@ cp .env.example .env            # add your GROQ_API_KEY
 dbtsmith --source orders --instruction "..." --output ... --join customers
 ```
 
+## Streamlit UI
+
+A form-based web UI, as an alternative to the CLI — same underlying pipeline, with live step-by-step progress and the generated SQL/schema.yml displayed with syntax highlighting.
+
+```bash
+pip install -e ".[ui]"     # installs Streamlit, not included by default
+streamlit run src/dbtsmith/ui/app.py
+```
+
+Opens automatically in your browser (usually `http://localhost:8501`). Fill in the same fields as the CLI (source, instruction, output name, join targets, output directory) and click Generate.
+
 ## Tech stack
 
 - **Language:** Python 3.13+
@@ -88,6 +99,7 @@ dbtsmith --source orders --instruction "..." --output ... --join customers
 - **Sources:** Postgres tables, or CSV files (loaded via `dbt seed`)
 - **Validation:** pydantic for the structured IR, pytest for the test suite
 - **CLI:** click
+- **UI:** Streamlit (optional)
 - **Containerization:** Docker + Docker Compose
 
 ## Project structure
@@ -99,7 +111,8 @@ src/dbtsmith/
 ├── generate/        # deterministic dbt project generation
 ├── validate/        # dbt seed/run/test execution + pass/fail reporting
 ├── dbt_templates/   # Jinja templates used by generate/
-└── cli.py           # entrypoint
+├── ui/              # Streamlit web UI
+└── cli.py           # CLI entrypoint
 ```
 
 ## Testing
@@ -108,7 +121,7 @@ src/dbtsmith/
 pytest
 ```
 
-Some tests require the local Postgres container running (`docker compose up -d postgres`); one test requires `GROQ_API_KEY` and is skipped automatically if it's not set. CI runs the deterministic subset of the suite on every push, including a real Postgres service container for schema-introspection tests.
+Some tests require the local Postgres container running (`docker compose up -d postgres`); one test requires `GROQ_API_KEY` and is skipped automatically if it's not set. The Streamlit UI is tested via `streamlit.testing.v1.AppTest` and requires the `ui` extras installed (`pip install -e ".[ui,dev]"`). CI runs the deterministic subset of the suite on every push, including a real Postgres service container for schema-introspection tests.
 
 ## v1 scope
 
@@ -123,7 +136,6 @@ Deliberately narrow, to prove the core pipeline end-to-end before broadening:
 ## Possible future improvements
 
 - **LLM self-correction loop** — on `dbt test` failure, feed the error back to the LLM and attempt a fix (a genuine LangGraph use case — a real loop with state, not a single call)
-- **Streamlit interface** as an alternative to the CLI
 - Support for multiple joins/aggregations per transformation
 - Proper CSV date-column detection
 - Looser, more freeform natural-language input, once the structured-input pipeline is well-proven
