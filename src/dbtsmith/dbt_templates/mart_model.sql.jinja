@@ -1,5 +1,5 @@
 SELECT
     {{ select_columns }}
 FROM {{ ref_expr }} o
-{{ join_clause }}
+{{ join_clauses }}
 GROUP BY {{ group_by_expr }}
