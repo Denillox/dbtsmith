@@ -23,6 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov"]
+ui = ["streamlit"]
 
 [project.scripts]
 dbtsmith = "dbtsmith.cli:generate"
