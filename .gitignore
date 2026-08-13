@@ -17,3 +17,4 @@ Thumbs.db
 htmlcov/
 generated_project/.user.yml
 docker_output/
+streamlit_output/

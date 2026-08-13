@@ -1,7 +1,5 @@
 SELECT
-{% for col in columns %}
-    {{ col }}{% if not loop.last %},{% endif %}
-{% endfor %}
+    {{ column_list }}
 FROM (
     SELECT
         *,

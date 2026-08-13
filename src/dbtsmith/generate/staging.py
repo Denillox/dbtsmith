@@ -35,13 +35,13 @@ def generate_staging_model(ir: TransformationIR, schema: TableSchema) -> str:
         source_ref = f"{{{{ source('dbtsmith_output', '{ir.source.identifier}') }}}}"
 
     columns = [col.name for col in schema.columns]
+    column_list = ",\n    ".join(columns)
 
     if dedupe_step is None:
-        column_list = ",\n    ".join(columns)
         return f"SELECT\n    {column_list}\nFROM {source_ref}"
 
     return template.render(
-        columns=columns,
+        column_list=column_list,
         dedupe_keys=dedupe_step.keys,
         order_by=dedupe_step.order_by,
         source_ref=source_ref,
