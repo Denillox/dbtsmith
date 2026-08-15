@@ -134,3 +134,31 @@ def test_multi_join_mart_validates_against_real_data(tmp_path):
 
     result = validate_project(tmp_path)
     assert result.success is True
+
+
+def test_generate_mart_model_multi_column_group_by():
+    ir = _make_ir(
+        transformations=[
+            {
+                "type": "join",
+                "target": "customers",
+                "on": [{"left_column": "email", "right_column": "email"}],
+                "how": "inner",
+            },
+            {
+                "type": "aggregate",
+                "group_by": [
+                    {"column": "order_date", "granularity": "month"},
+                    {"column": "product_id", "granularity": None},
+                ],
+                "aggregations": [
+                    {"column": "order_total", "function": "sum", "alias": "total_orders"}
+                ],
+            },
+        ],
+    )
+    sql = generate_mart_model(ir)
+
+    assert "DATE_TRUNC('month', o.order_date) AS order_date_month" in sql
+    assert "o.product_id AS product_id" in sql
+    assert "GROUP BY DATE_TRUNC('month', o.order_date), o.product_id" in sql

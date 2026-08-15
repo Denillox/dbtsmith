@@ -26,14 +26,14 @@ def _mart_model_entry(ir: TransformationIR) -> dict:
     if aggregate_step is None:
         return {"name": ir.output.name, "columns": []}
 
-    group_col = aggregate_step.group_by[0]
-    alias = group_by_alias(group_col)
+    columns = [
+        {"name": group_by_alias(group_col), "tests": ["not_null"]}
+        for group_col in aggregate_step.group_by
+    ]
 
     return {
         "name": ir.output.name,
-        "columns": [
-            {"name": alias, "tests": ["not_null"]},
-        ],
+        "columns": columns,
     }
 
 

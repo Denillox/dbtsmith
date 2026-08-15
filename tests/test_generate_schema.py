@@ -63,3 +63,34 @@ def test_generate_schema_yml_no_mart():
 
     assert len(parsed["models"]) == 1
     assert parsed["models"][0]["name"] == "stg_orders"
+
+
+def test_generate_schema_yml_multi_column_group_by():
+    ir = TransformationIR(
+        source={"type": "postgres_table", "identifier": "orders"},
+        transformations=[
+            {
+                "type": "join",
+                "target": "customers",
+                "on": [{"left_column": "email", "right_column": "email"}],
+                "how": "inner",
+            },
+            {
+                "type": "aggregate",
+                "group_by": [
+                    {"column": "order_date", "granularity": "month"},
+                    {"column": "product_id", "granularity": None},
+                ],
+                "aggregations": [
+                    {"column": "order_total", "function": "sum", "alias": "total_orders"}
+                ],
+            },
+        ],
+        output={"name": "monthly_product_orders"},
+    )
+    yml_text = generate_schema_yml(ir)
+    parsed = yaml.safe_load(yml_text)
+
+    mart = next(m for m in parsed["models"] if m["name"] == "monthly_product_orders")
+    column_names = {col["name"] for col in mart["columns"]}
+    assert column_names == {"order_date_month", "product_id"}
