@@ -1,5 +1,5 @@
 from typing import Annotated, Literal, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ── Source ───────────────────────────────────────────────────────────────
@@ -35,12 +35,14 @@ class JoinStep(BaseModel):
 
 class Aggregation(BaseModel):
     column: str
+    table: str | None = None
     function: Literal["sum", "count", "avg"]
     alias: str
 
 
 class GroupByColumn(BaseModel):
     column: str
+    table: str | None = None
     granularity: Literal["day", "month", "year"] | None = None
 
 
@@ -65,10 +67,30 @@ class Output(BaseModel):
     name: str
 
 
-# ── The top-level IR ─────────────────────────────────────────────────────
-
 class TransformationIR(BaseModel):
     source: Source
     transformations: list[Step]
-
     output: Output
+
+    @model_validator(mode="after")
+    def validate_table_references(self) -> "TransformationIR":
+        join_targets = {
+            step.target for step in self.transformations if isinstance(step, JoinStep)
+        }
+
+        for step in self.transformations:
+            if isinstance(step, AggregateStep):
+                for group_col in step.group_by:
+                    if group_col.table is not None and group_col.table not in join_targets:
+                        raise ValueError(
+                            f"GroupByColumn references table '{group_col.table}', "
+                            f"but no JoinStep targets it."
+                        )
+                for agg in step.aggregations:
+                    if agg.table is not None and agg.table not in join_targets:
+                        raise ValueError(
+                            f"Aggregation references table '{agg.table}', "
+                            f"but no JoinStep targets it."
+                        )
+
+        return self

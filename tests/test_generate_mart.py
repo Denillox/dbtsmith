@@ -162,3 +162,28 @@ def test_generate_mart_model_multi_column_group_by():
     assert "DATE_TRUNC('month', o.order_date) AS order_date_month" in sql
     assert "o.product_id AS product_id" in sql
     assert "GROUP BY DATE_TRUNC('month', o.order_date), o.product_id" in sql
+
+
+def test_generate_mart_model_joined_table_column():
+    ir = _make_ir(
+        transformations=[
+            {
+                "type": "join",
+                "target": "customers",
+                "on": [{"left_column": "customer_id", "right_column": "id"}],
+                "how": "inner",
+            },
+            {
+                "type": "aggregate",
+                "group_by": [{"column": "region", "table": "customers"}],
+                "aggregations": [
+                    {"column": "order_total", "function": "sum", "alias": "total"}
+                ],
+            },
+        ],
+    )
+    sql = generate_mart_model(ir)
+
+    assert "customers.region AS region" in sql
+    assert "GROUP BY customers.region" in sql
+    assert "SUM(o.order_total) AS total" in sql

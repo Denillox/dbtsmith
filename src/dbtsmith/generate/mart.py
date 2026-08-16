@@ -37,13 +37,19 @@ def _build_join_clauses(join_steps: list[JoinStep]) -> str:
     return "\n".join(clauses)
 
 
+def _column_ref(column: str, table: str | None) -> str:
+    prefix = "o" if table is None else table
+    return f"{prefix}.{column}"
+
+
 def _build_group_by_exprs(aggregate_step: AggregateStep) -> list[str]:
     exprs = []
     for group_col in aggregate_step.group_by:
+        ref = _column_ref(group_col.column, group_col.table)
         if group_col.granularity is not None:
-            exprs.append(f"DATE_TRUNC('{group_col.granularity}', o.{group_col.column})")
+            exprs.append(f"DATE_TRUNC('{group_col.granularity}', {ref})")
         else:
-            exprs.append(f"o.{group_col.column}")
+            exprs.append(ref)
     return exprs
 
 
@@ -61,7 +67,8 @@ def _build_select_columns(aggregate_step: AggregateStep, group_by_exprs: list[st
 
     for agg in aggregate_step.aggregations:
         func_sql = agg.function.upper()
-        lines.append(f"{func_sql}(o.{agg.column}) AS {agg.alias}")
+        ref = _column_ref(agg.column, agg.table)
+        lines.append(f"{func_sql}({ref}) AS {agg.alias}")
 
     return ",\n    ".join(lines)
 

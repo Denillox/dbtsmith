@@ -21,13 +21,18 @@ def _build_prompt(instruction: str, schemas: list[TableSchema]) -> str:
 
     prompt += f'Instruction: {instruction}\n\n'
     prompt += (
-        'Given this schema and instruction, produce the ordered list of '
-        'transformation steps. For aggregation steps, when grouping by a '
-        'time period (e.g. "by month"), set the group_by column to the '
-        'real date/timestamp column name and set granularity to "day", '
-        '"month", or "year" — do not write raw SQL expressions.'
-        'For dedupe steps, always inlcude "order_by" - a real column'
-        'name to use for determining which duplicate to keep'
+    'Given this schema and instruction, produce the ordered list of '
+    'transformation steps. For aggregation steps, when grouping by a '
+    'time period (e.g. "by month"), set the group_by column to the '
+    'real date/timestamp column name and set granularity to "day", '
+    '"month", or "year" — do not write raw SQL expressions. '
+    'For dedupe steps, always include "order_by" — a real column '
+    'name to use for determining which duplicate to keep. '
+    'For aggregations and group_by columns: if the column belongs to '
+    'the main source table, leave "table" unset. If it belongs to a '
+    'joined table instead, set "table" to that joined table\'s name '
+    'exactly as given above — only do this for a table that is '
+    'actually being joined in this instruction.'
     )
 
     return prompt
