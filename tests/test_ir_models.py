@@ -1,5 +1,23 @@
 from dbtsmith.ir.models import TransformationIR
 
+import pytest
+
+
+def test_transformation_ir_rejects_ungrounded_table_reference():
+    with pytest.raises(ValueError):
+        TransformationIR(
+            source={"type": "postgres_table", "identifier": "orders"},
+            transformations=[
+                {
+                    "type": "aggregate",
+                    "group_by": [{"column": "region", "table": "customers"}],
+                    "aggregations": [
+                        {"column": "order_total", "function": "sum", "alias": "total"}
+                    ],
+                },
+            ],
+            output={"name": "orders_by_region"},
+        )
 
 def test_transformation_ir_round_trip():
     ir = TransformationIR(
