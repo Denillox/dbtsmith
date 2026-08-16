@@ -12,24 +12,24 @@ _DTYPE_MAP = {
 }
 
 
+def _looks_like_date(series: pd.Series) -> bool:
+    non_null = series.dropna()
+    if non_null.empty:
+        return False
+    parsed = pd.to_datetime(non_null, format="%Y-%m-%d", errors="coerce")
+    return bool(parsed.notna().all())
+
+
 def get_table_schema(csv_path: str) -> TableSchema:
-    # Introspect a CSV file and return its column schema
-
-    '''
-    Limitation: date-like columns are inferred as "text" and not "date,
-    pandas doesn't detect dates without being told which columns to
-    parse in advance. It works in practice cause Postgres casts
-    text that looks like a date leniently when used in DATE_TRUNC(...),
-    
-    TODO: Try to detect dates properly using parse_dates=[...]
-    '''
-
     path = Path(csv_path)
-
     df = pd.read_csv(path)
 
-    columns = [
-        ColumnInfo(name=name, data_type=_DTYPE_MAP.get(str(dtype), "text"))
-        for name, dtype in df.dtypes.items()
-    ]
+    columns = []
+    for name, dtype in df.dtypes.items():
+        mapped_type = _DTYPE_MAP.get(str(dtype), "text")
+        if mapped_type == "text" and _looks_like_date(df[name]):
+            mapped_type = "date"
+
+        columns.append(ColumnInfo(name=name, data_type=mapped_type))
+
     return TableSchema(table_name=path.stem, columns=columns)
