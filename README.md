@@ -5,7 +5,7 @@ Turns a natural-language description of a data transformation into a working, va
 ```
 Input:  source = a Postgres table (or CSV file), instruction = "dedupe
         by email, join with customers and with products, aggregate
-        order totals by month and by product"
+        order totals by month and by customer region"
 
 Output: a scaffolded dbt project (staging model, mart, schema.yml with
         tests) that has actually been run against the real data and
@@ -17,7 +17,7 @@ Output: a scaffolded dbt project (staging model, mart, schema.yml with
 Asking an LLM to freely generate a dbt project from a prompt is unreliable — it hallucinates column names, references tables that don't exist, and produces SQL that may not run. This project avoids that failure mode in three ways:
 
 1. **Structured intermediate representation first.** Natural language is parsed into a validated, typed structure (source, transformation steps, output shape) *before* any SQL is generated — not freeform text-to-code.
-2. **Schema-grounded generation.** The tool introspects the real source's actual columns and types and grounds every step in that — an LLM can't invent a column that doesn't exist without it failing validation.
+2. **Schema-grounded generation.** The tool introspects the real source's actual columns and types and grounds every step in that — an LLM can't invent a column that doesn't exist without it failing validation. Cross-field checks catch related mistakes too — e.g. referencing a joined table's column when that table was never actually joined.
 3. **Deterministic generation, real validation.** Once the structure is known, the actual SQL/YAML generation step is template-based, not LLM-generated — same input always produces the same output. The result is then run for real: `dbt run` and `dbt test` against real data, with pass/fail reported back.
 
 ## Architecture
@@ -57,19 +57,18 @@ docker compose run --rm dbtsmith \
 
 Generated output lands in `./docker_output` on your machine.
 
-Multiple joins and multiple group-by columns both work — pass `--join` more than once, and describe more than one grouping dimension in the instruction:
+Multiple joins and multiple group-by columns both work, and aggregations/group-by can reference a joined table's own columns, not just the source table's:
 
 ```bash
 docker compose run --rm dbtsmith \
   --source orders \
-  --instruction "dedupe by email, join with customers and with products, aggregate order totals by month and by product" \
-  --output monthly_product_orders \
+  --instruction "dedupe by email, join with customers, aggregate order totals by month and by customer region" \
+  --output monthly_region_orders \
   --join customers \
-  --join products \
   --output-dir /app/output
 ```
 
-A CSV file works the same way — just point `--source` at a `.csv` path instead of a table name (source type is inferred automatically from the extension):
+A CSV file works the same way — just point `--source` at a `.csv` path instead of a table name (source type is inferred automatically from the extension). ISO-format date columns (`YYYY-MM-DD`) are detected automatically:
 
 ```bash
 docker compose run --rm dbtsmith \
@@ -111,7 +110,7 @@ Opens automatically in your browser (usually `http://localhost:8501`). Fill in t
 - **LLM orchestration:** LangChain, using Groq (Llama 3.3 70B); LangGraph for the self-correction loop
 - **Transformation target:** dbt Core (Postgres adapter)
 - **Sources:** Postgres tables, or CSV files (loaded via `dbt seed`)
-- **Validation:** pydantic for the structured IR, pytest for the test suite
+- **Validation:** pydantic for the structured IR (including cross-field validation of table references), pytest for the test suite
 - **CLI:** click
 - **UI:** Streamlit (optional)
 - **Containerization:** Docker + Docker Compose
@@ -144,15 +143,14 @@ Deliberately narrow, to prove the core pipeline end-to-end before broadening:
 
 - Postgres table or CSV file as the main source; join targets are Postgres-only (no CSV-to-CSV or CSV-to-Postgres joins yet)
 - Joins are star-schema only — every join connects back to the staging model directly, not to another join's table (no chained joins)
-- Aggregations and group-by columns can only reference the staging model's own columns, not a joined table's columns (e.g. summing or grouping by a column from `customers` isn't supported yet)
+- Aggregations and group-by columns can reference either the staging model or a directly-joined table's columns — validated at the IR level, so referencing a table that was never actually joined is rejected immediately, before generation
 - Basic generated tests only (`not_null`, `unique`) — scoped to what the IR structurally guarantees, not general data-quality heuristics
 - Self-correction only ever produces a corrected structured plan, never edits generated SQL directly — generation stays fully deterministic even on retry
-- CSV date-like columns are inferred as `text`, not `date` — works in practice (Postgres casts leniently in `DATE_TRUNC(...)`), but not a fully correct inference; documented rather than silently accepted
+- CSV date detection covers ISO format (`YYYY-MM-DD`) only — other formats are still inferred as `text`
 
 ## Possible future improvements
 
-- Aggregations and group-by referencing joined-table columns, not just the staging model
 - Chained joins (joining against a previously-joined table, not just the staging model)
-- Proper CSV date-column detection
+- Broader CSV date-format detection (not just ISO)
 - Richer Streamlit UI — per-test pass/fail breakdown, zip download of the generated project, general layout/UX polish
 - Looser, more freeform natural-language input, once the structured-input pipeline is well-proven
