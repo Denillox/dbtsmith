@@ -4,8 +4,8 @@ Turns a natural-language description of a data transformation into a working, va
 
 ```
 Input:  source = a Postgres table (or CSV file), instruction = "dedupe
-        by email, join with the customers table, aggregate order
-        totals by month"
+        by email, join with customers and with products, aggregate
+        order totals by month and by product"
 
 Output: a scaffolded dbt project (staging model, mart, schema.yml with
         tests) that has actually been run against the real data and
@@ -57,6 +57,18 @@ docker compose run --rm dbtsmith \
 
 Generated output lands in `./docker_output` on your machine.
 
+Multiple joins and multiple group-by columns both work — pass `--join` more than once, and describe more than one grouping dimension in the instruction:
+
+```bash
+docker compose run --rm dbtsmith \
+  --source orders \
+  --instruction "dedupe by email, join with customers and with products, aggregate order totals by month and by product" \
+  --output monthly_product_orders \
+  --join customers \
+  --join products \
+  --output-dir /app/output
+```
+
 A CSV file works the same way — just point `--source` at a `.csv` path instead of a table name (source type is inferred automatically from the extension):
 
 ```bash
@@ -80,6 +92,8 @@ cp .env.example .env            # add your GROQ_API_KEY
 dbtsmith --source orders --instruction "..." --output ... --join customers
 ```
 
+Add `--allow-retry` to enable the self-correction loop: on validation failure, the failure is fed back to the LLM for a corrected structured plan, then regenerated and revalidated (up to 2 total attempts). Off by default.
+
 ## Streamlit UI
 
 A form-based web UI, as an alternative to the CLI — same underlying pipeline, with live step-by-step progress and the generated SQL/schema.yml displayed with syntax highlighting.
@@ -94,7 +108,7 @@ Opens automatically in your browser (usually `http://localhost:8501`). Fill in t
 ## Tech stack
 
 - **Language:** Python 3.13+
-- **LLM orchestration:** LangChain, using Groq (Llama 3.3 70B)
+- **LLM orchestration:** LangChain, using Groq (Llama 3.3 70B); LangGraph for the self-correction loop
 - **Transformation target:** dbt Core (Postgres adapter)
 - **Sources:** Postgres tables, or CSV files (loaded via `dbt seed`)
 - **Validation:** pydantic for the structured IR, pytest for the test suite
@@ -110,6 +124,7 @@ src/dbtsmith/
 ├── introspect/      # real schema introspection (Postgres, CSV)
 ├── generate/        # deterministic dbt project generation
 ├── validate/        # dbt seed/run/test execution + pass/fail reporting
+├── correct/         # LangGraph self-correction loop
 ├── dbt_templates/   # Jinja templates used by generate/
 ├── ui/              # Streamlit web UI
 └── cli.py           # CLI entrypoint
@@ -121,21 +136,23 @@ src/dbtsmith/
 pytest
 ```
 
-Some tests require the local Postgres container running (`docker compose up -d postgres`); one test requires `GROQ_API_KEY` and is skipped automatically if it's not set. The Streamlit UI is tested via `streamlit.testing.v1.AppTest` and requires the `ui` extras installed (`pip install -e ".[ui,dev]"`). CI runs the deterministic subset of the suite on every push, including a real Postgres service container for schema-introspection tests.
+Some tests require the local Postgres container running (`docker compose up -d postgres`); tests involving LLM calls (instruction parsing, self-correction) require `GROQ_API_KEY` and are skipped automatically if it's not set. The Streamlit UI is tested via `streamlit.testing.v1.AppTest` and requires the `ui` extras installed (`pip install -e ".[ui,dev]"`). CI runs the deterministic subset of the suite on every push, including a real Postgres service container for schema-introspection and multi-join tests.
 
 ## v1 scope
 
 Deliberately narrow, to prove the core pipeline end-to-end before broadening:
 
 - Postgres table or CSV file as the main source; join targets are Postgres-only (no CSV-to-CSV or CSV-to-Postgres joins yet)
-- Exactly one join and one aggregate step per transformation
+- Joins are star-schema only — every join connects back to the staging model directly, not to another join's table (no chained joins)
+- Aggregations and group-by columns can only reference the staging model's own columns, not a joined table's columns (e.g. summing or grouping by a column from `customers` isn't supported yet)
 - Basic generated tests only (`not_null`, `unique`) — scoped to what the IR structurally guarantees, not general data-quality heuristics
-- No self-correction loop on validation failure — failures are reported clearly, not auto-fixed (see below)
+- Self-correction only ever produces a corrected structured plan, never edits generated SQL directly — generation stays fully deterministic even on retry
 - CSV date-like columns are inferred as `text`, not `date` — works in practice (Postgres casts leniently in `DATE_TRUNC(...)`), but not a fully correct inference; documented rather than silently accepted
 
 ## Possible future improvements
 
-- **LLM self-correction loop** — on `dbt test` failure, feed the error back to the LLM and attempt a fix (a genuine LangGraph use case — a real loop with state, not a single call)
-- Support for multiple joins/aggregations per transformation
+- Aggregations and group-by referencing joined-table columns, not just the staging model
+- Chained joins (joining against a previously-joined table, not just the staging model)
 - Proper CSV date-column detection
+- Richer Streamlit UI — per-test pass/fail breakdown, zip download of the generated project, general layout/UX polish
 - Looser, more freeform natural-language input, once the structured-input pipeline is well-proven
